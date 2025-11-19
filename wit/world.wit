@@ -1,0 +1,110 @@
+package jsonplaceholder:api;
+
+/// JSONPlaceholder API interface.
+interface jsonplaceholder-api {
+    /// Geographical coordinates.
+record geo {
+    lat: string,
+    lng: string,
+}
+
+/// Postal address.
+record address {
+    street: string,
+    suite: string,
+    city: string,
+    zipcode: string,
+    geo: geo,
+}
+
+/// Company details.
+record company {
+    name: string,
+    catch-phrase: string,
+    bs: string,
+}
+
+/// User model.
+record user {
+    id: u64,
+    name: string,
+    username: string,
+    email: string,
+    phone: string,
+    website: string,
+    company: company,
+    address: address,
+}
+
+/// Blog post.
+record post {
+    id: u64,
+    user-id: u64,
+    title: string,
+    body: string,
+}
+
+/// Comment.
+record comment {
+    id: u64,
+    post-id: u64,
+    name: string,
+    email: string,
+    body: string,
+}
+
+/// Album.
+record album {
+    id: u64,
+    user-id: u64,
+    title: string,
+}
+
+/// Photo.
+record photo {
+    id: u64,
+    album-id: u64,
+    title: string,
+    url: string,
+    thumbnail-url: string,
+}
+
+/// Todo item.
+record todo {
+    id: u64,
+    user-id: u64,
+    title: string,
+    completed: bool,
+}
+
+/// Generic 404 error.
+record not-found-error {
+    message: string
+}
+
+
+    get-posts: func(user-id: u64) -> list<post>;
+    get-post: func(id: u64) -> result<post, not-found-error>;
+    get-post-comments: func(id: u64) -> result<list<comment>, not-found-error>;
+
+    get-comments: func(id: option<u64>, post-id: option<u64>) -> list<comment>;
+    get-comment: func(id: u64) -> result<comment, not-found-error>;
+
+    get-albums: func(id: option<u64>, user-id: option<u64>) -> list<album>;
+    get-album: func(id: u64) -> result<album, not-found-error>;
+    get-album-photos: func(id: u64) -> result<list<photo>, not-found-error>;
+
+    get-photos: func(id: option<u64>, album-id: option<u64>) -> list<photo>;
+    get-photo: func(id: u64) -> result<photo, not-found-error>;
+
+    get-todos: func(id: option<u64>, user-id: option<u64>) -> list<todo>;
+    get-todo: func(id: u64) -> result<todo, not-found-error>;
+
+    get-users: func(id: option<u64>, email: option<string>) -> list<user>;
+    get-user: func(id: u64) -> result<user, not-found-error>;
+}
+
+/// World exporting the API.
+world jsonplaceholder {
+    export jsonplaceholder-api;
+}
