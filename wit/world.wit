@@ -3,84 +3,84 @@ package jsonplaceholder:api;
 /// JSONPlaceholder API interface.
 interface jsonplaceholder-api {
     /// Geographical coordinates.
-record geo {
-    lat: string,
-    lng: string,
-}
+    record geo {
+        lat: string,
+        lng: string,
+    }
 
-/// Postal address.
-record address {
-    street: string,
-    suite: string,
-    city: string,
-    zipcode: string,
-    geo: geo,
-}
+    /// Postal address.
+    record address {
+        street: string,
+        suite: string,
+        city: string,
+        zipcode: string,
+        geo: geo,
+    }
 
-/// Company details.
-record company {
-    name: string,
-    catch-phrase: string,
-    bs: string,
-}
+    /// Company details.
+    record company {
+        name: string,
+        catch-phrase: string,
+        bs: string,
+    }
 
-/// User model.
-record user {
-    id: u64,
-    name: string,
-    username: string,
-    email: string,
-    phone: string,
-    website: string,
-    company: company,
-    address: address,
-}
+    /// User model.
+    record user {
+        id: u64,
+        name: string,
+        username: string,
+        email: string,
+        phone: string,
+        website: string,
+        company: company,
+        address: address,
+    }
 
-/// Blog post.
-record post {
-    id: u64,
-    user-id: u64,
-    title: string,
-    body: string,
-}
+    /// Blog post.
+    record post {
+        id: u64,
+        user-id: u64,
+        title: string,
+        body: string,
+    }
 
-/// Comment.
-record comment {
-    id: u64,
-    post-id: u64,
-    name: string,
-    email: string,
-    body: string,
-}
+    /// Comment.
+    record comment {
+        id: u64,
+        post-id: u64,
+        name: string,
+        email: string,
+        body: string,
+    }
 
-/// Album.
-record album {
-    id: u64,
-    user-id: u64,
-    title: string,
-}
+    /// Album.
+    record album {
+        id: u64,
+        user-id: u64,
+        title: string,
+    }
 
-/// Photo.
-record photo {
-    id: u64,
-    album-id: u64,
-    title: string,
-    url: string,
-    thumbnail-url: string,
-}
+    /// Photo.
+    record photo {
+        id: u64,
+        album-id: u64,
+        title: string,
+        url: string,
+        thumbnail-url: string,
+    }
 
-/// Todo item.
-record todo {
-    id: u64,
-    user-id: u64,
-    title: string,
-    completed: bool,
-}
+    /// Todo item.
+    record todo {
+        id: u64,
+        user-id: u64,
+        title: string,
+        completed: bool,
+    }
 
 /// Generic 404 error.
-record not-found-error {
-    message: string
-}
+    record not-found-error {
+        message: string
+    }
 
 
     get-posts: func(user-id: u64) -> list<post>;
