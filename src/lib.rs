@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use serde::Serialize;
 use wit_bindgen::generate;
 
 generate!({
@@ -7,46 +8,74 @@ generate!({
 
 use exports::jsonplaceholder::api::jsonplaceholder_api::Guest as JsonplaceholderApi;
 use exports::jsonplaceholder::api::jsonplaceholder_api::NotFoundError;
+use wasi::http::outgoing_handler;
 use wasi::http::types::*;
 
 use crate::exports::jsonplaceholder::api::jsonplaceholder_api::{
     Address, Album, Comment, Company, Geo, Photo, Post, Todo, User,
 };
 
-const BASE: &str = "https://jsonplaceholder.typicode.com";
+//const BASE: &str = "https://jsonplaceholder.typicode.com";
 
-/// Generic HTTP GET JSON
+/// Generic HTTP GET JSON - using synchronous blocking approach
 fn fetch_json<T: for<'a> Deserialize<'a>>(path: &str) -> Result<T, ()> {
-    // construct URL
-    let url = format!("{BASE}{path}");
+    // Construct the request
+    let request = OutgoingRequest::new(Fields::new());
 
-    let req = OutgoingRequest::new(Fields::new());
-    req.set_method(&Method::Get).map_err(|_| ())?;
-    req.set_path_with_query(Some(&url)).map_err(|_| ())?;
+    // Set method to GET
+    request.set_method(&Method::Get).map_err(|_| ())?;
 
-    let body = req.body().unwrap(); // no body for GET
+    // Set scheme to HTTPS
+    request.set_scheme(Some(&Scheme::Https)).map_err(|_| ())?;
+
+    // Set authority to jsonplaceholder domain
+    request
+        .set_authority(Some("jsonplaceholder.typicode.com"))
+        .map_err(|_| ())?;
+
+    // Set path with query (e.g., "/posts/1" or "/posts?userId=1")
+    request.set_path_with_query(Some(path)).map_err(|_| ())?;
+
+    // No body for GET requests
+    let body = request.body().unwrap();
     drop(body);
 
-    let res_fut = wasi::http::outgoing_handler::handle(req, None).map_err(|_| ())?;
-    let res = match res_fut.get() {
-        Some(Ok(Ok(r))) => r,
-        _ => return Err(()),
-    };
-    if res.status() != 200 {
+    // Send the request
+    let future_response = outgoing_handler::handle(request, None).map_err(|_| ())?;
+
+    // Block until response is ready
+    future_response.subscribe().block();
+
+    // Get the response
+    let incoming_response = future_response
+        .get()
+        .ok_or(())? // Future not ready (shouldn't happen after block)
+        .map_err(|_| ())? // Error from the future
+        .map_err(|_| ())?; // HTTP error
+
+    // Check status code
+    if incoming_response.status() != 200 {
         return Err(());
     }
 
-    // read body
-    let incoming_body = res.consume().unwrap();
-    let stream = incoming_body.stream().unwrap();
+    // Read the response body
+    let body_stream = incoming_response.consume().map_err(|_| ())?;
+    let input_stream = body_stream.stream().map_err(|_| ())?;
+
     let mut bytes = Vec::new();
     loop {
-        let chunk = stream.read(4096).map_err(|_| ())?;
-        if chunk.is_empty() {
-            break;
+        match input_stream.read(8192) {
+            Ok(chunk) => {
+                if chunk.is_empty() {
+                    break;
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            Err(_) => break,
         }
-        bytes.extend_from_slice(&chunk);
     }
+
+    // Parse JSON
     serde_json::from_slice(&bytes).map_err(|_| ())
 }
 
@@ -54,7 +83,7 @@ fn fetch_json<T: for<'a> Deserialize<'a>>(path: &str) -> Result<T, ()> {
 // DATA MODELS FOR SERDE
 //
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct GeoSerde {
     lat: String,
     lng: String,
@@ -69,7 +98,7 @@ impl From<GeoSerde> for Geo {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct AddressSerde {
     street: String,
     suite: String,
@@ -90,7 +119,7 @@ impl From<AddressSerde> for Address {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct CompanySerde {
     name: String,
     #[serde(rename = "catchPhrase")]
@@ -108,7 +137,7 @@ impl From<CompanySerde> for Company {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct PostSerde {
     id: u64,
     #[serde(rename = "userId")]
@@ -128,7 +157,7 @@ impl From<PostSerde> for Post {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct UserSerde {
     id: u64,
     name: String,
@@ -155,7 +184,7 @@ impl From<UserSerde> for User {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct CommentSerde {
     id: u64,
     #[serde(rename = "postId")]
@@ -177,7 +206,7 @@ impl From<CommentSerde> for Comment {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct AlbumSerde {
     id: u64,
     #[serde(rename = "userId")]
@@ -195,7 +224,7 @@ impl From<AlbumSerde> for Album {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct PhotoSerde {
     id: u64,
     #[serde(rename = "albumId")]
@@ -218,7 +247,7 @@ impl From<PhotoSerde> for Photo {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct TodoSerde {
     id: u64,
     #[serde(rename = "userId")]
@@ -245,8 +274,6 @@ impl From<TodoSerde> for Todo {
 struct ApiImpl;
 
 impl JsonplaceholderApi for ApiImpl {
-    //
-    // posts
     fn get_posts(user_id: u64) -> Vec<exports::jsonplaceholder::api::jsonplaceholder_api::Post> {
         fetch_json::<Vec<PostSerde>>(&format!("/posts?userId={user_id}"))
             .unwrap_or_default()
@@ -260,7 +287,9 @@ impl JsonplaceholderApi for ApiImpl {
     ) -> Result<exports::jsonplaceholder::api::jsonplaceholder_api::Post, NotFoundError> {
         fetch_json::<PostSerde>(&format!("/posts/{id}"))
             .map(|p| p.into())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 
     fn get_post_comments(
@@ -269,7 +298,9 @@ impl JsonplaceholderApi for ApiImpl {
     {
         fetch_json::<Vec<CommentSerde>>(&format!("/posts/{id}/comments"))
             .map(|v| v.into_iter().map(|c| c.into()).collect())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 
     fn get_comments(
@@ -302,7 +333,9 @@ impl JsonplaceholderApi for ApiImpl {
     ) -> Result<exports::jsonplaceholder::api::jsonplaceholder_api::Comment, NotFoundError> {
         fetch_json::<CommentSerde>(&format!("/comments/{id}"))
             .map(|c| c.into())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 
     fn get_albums(
@@ -335,7 +368,9 @@ impl JsonplaceholderApi for ApiImpl {
     ) -> Result<exports::jsonplaceholder::api::jsonplaceholder_api::Album, NotFoundError> {
         fetch_json::<AlbumSerde>(&format!("/albums/{id}"))
             .map(|a| a.into())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 
     fn get_album_photos(
@@ -343,7 +378,9 @@ impl JsonplaceholderApi for ApiImpl {
     ) -> Result<Vec<exports::jsonplaceholder::api::jsonplaceholder_api::Photo>, NotFoundError> {
         fetch_json::<Vec<PhotoSerde>>(&format!("/albums/{id}/photos"))
             .map(|v| v.into_iter().map(|p| p.into()).collect())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 
     fn get_photos(
@@ -376,7 +413,9 @@ impl JsonplaceholderApi for ApiImpl {
     ) -> Result<exports::jsonplaceholder::api::jsonplaceholder_api::Photo, NotFoundError> {
         fetch_json::<PhotoSerde>(&format!("/photos/{id}"))
             .map(|p| p.into())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 
     fn get_todos(
@@ -409,7 +448,9 @@ impl JsonplaceholderApi for ApiImpl {
     ) -> Result<exports::jsonplaceholder::api::jsonplaceholder_api::Todo, NotFoundError> {
         fetch_json::<TodoSerde>(&format!("/todos/{id}"))
             .map(|t| t.into())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 
     fn get_users(
@@ -442,7 +483,9 @@ impl JsonplaceholderApi for ApiImpl {
     ) -> Result<exports::jsonplaceholder::api::jsonplaceholder_api::User, NotFoundError> {
         fetch_json::<UserSerde>(&format!("/users/{id}"))
             .map(|u| u.into())
-            .map_err(|_| NotFoundError { message: "Not found".to_string() })
+            .map_err(|_| NotFoundError {
+                message: "Not found".to_string(),
+            })
     }
 }
 
