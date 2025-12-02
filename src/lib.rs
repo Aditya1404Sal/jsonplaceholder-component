@@ -1,15 +1,16 @@
 use serde::Deserialize;
 use serde::Serialize;
-use wit_bindgen::generate;
 
-generate!({
+wit_bindgen::generate!({
+    world: "jsonplaceholder",
     path: "wit",
+    generate_all,
 });
 
+use crate::wasi::http::outgoing_handler;
+use crate::wasi::http::types::*;
 use exports::jsonplaceholder::api::jsonplaceholder_api::Guest as JsonplaceholderApi;
 use exports::jsonplaceholder::api::jsonplaceholder_api::NotFoundError;
-use wasi::http::outgoing_handler;
-use wasi::http::types::*;
 
 use crate::exports::jsonplaceholder::api::jsonplaceholder_api::{
     Address, Album, Comment, Company, Geo, Photo, Post, Todo, User,

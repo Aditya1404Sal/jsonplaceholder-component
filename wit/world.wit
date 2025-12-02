@@ -106,5 +106,6 @@ interface jsonplaceholder-api {
 
 /// World exporting the API.
 world jsonplaceholder {
+    import wasi:http/outgoing-handler@0.2.2;
     export jsonplaceholder-api;
 }
